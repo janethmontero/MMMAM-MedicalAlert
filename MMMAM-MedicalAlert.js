@@ -5,6 +5,8 @@ Module.register("MMMAM-MedicalAlert",{
 
 	next: null, // Objeto next - contiene la siguiente alarma
 
+	active: null, // Objeto activo - contiene medicamento vigente dentro del rango de tiempo
+
 	alarmFired: false, // boolean alaermFired - bandera que indica si hay una alarma en este momento
 
     timer: null,
@@ -53,8 +55,10 @@ Module.register("MMMAM-MedicalAlert",{
 
     checkAlarm() {
         const currentTimeMilliseconds = moment().valueOf();
+				const timeRangeInMilliseconds = 1000 * 60 * 5; // 1 segundo * 60 segundos * 5 minutos
 
-        //Si no esta activada la alarma
+				// ESTA SECCION VERIFICA SI SE DEBE LANZAR LA ALARMA
+        // Si no esta activada la alarma
         if (!this.alarmFired && this.next && ((currentTimeMilliseconds - this.next.startDate) >= 0)) {
             const alert = this.setFormatAlert();
 
@@ -68,9 +72,22 @@ Module.register("MMMAM-MedicalAlert",{
 
             }, this.config.timer);
 
-        }else{
-            //console.log("*****NOEntre: " +  (currentTimeMilliseconds - this.next.startDate));
         }
+				// ESTA SECCION VERIFICA SI SE DEBE ACTIVAR UNA ALERTA QUE ESTE
+				// DENTRO DEL RANGO DE TOMA QUE ES DE 5 MIN.
+				// Si hay una siguiente y la alarma activa es diferente de la siguiente y la siguiente esta en el rango de 5 min la ACTIVA
+				if (this.next && (this.active !== this.next) && ((this.next.startDate - timeRangeInMilliseconds) <= currentTimeMilliseconds)) { //(((this.next.startDate - timeRangeInMilliseconds) <= currentTimeMilliseconds) && ((this.next.startDate - timeRangeInMilliseconds + 1000) >= currentTimeMilliseconds))) {
+					this.active = this.next;
+					//console.log("***Entre, la siguiente toma esta en el rango " + this.next.title);
+					this.sendNotification("UPDATE_PENDING_MEDICATION", this.active);
+				}
+				//Si hay una activa y esta fuera del rango de 5 min desactiva
+			/*	if (this.active && ((this.active.startDate + timeRangeInMilliseconds) <= currentTimeMilliseconds)) {
+					console.log("***SALI, la siguiente toma esta  FUERA DE rango " + this.active);
+					this.active = undefined;
+					this.sendNotification("UPDATE_PENDING_MEDICATION", this.active);
+				}*/
+
     },
 
 		showDetailsNext(){
@@ -121,8 +138,8 @@ Module.register("MMMAM-MedicalAlert",{
 				const token = x[i].split(",");
 				var descriptionMedication = '';
 			 // console.log(token[2]);
-				if (token[2]==='inyeccion' || token[2]==='inyección') {
-					descriptionMedication = 'una inyeccion de ' + token[1] + ' de ' + token[0] + '. '
+				if (token[2].includes('inyeccion') || token[2].includes('inyección')) {
+					descriptionMedication = 'una inyección de ' + token[1] + ' de ' + token[0] + '. '
 				}else {
 					descriptionMedication = '' + token[1] + ' de ' + token[0] + '. '
 				}
@@ -135,7 +152,7 @@ Module.register("MMMAM-MedicalAlert",{
 		setSpeechAlert(){
 			if (this.next) {
 				this.speechAlert = 'Es hora de la toma de ' + this.next.title+ '. La toma consiste en: ' + this.setDetailsNext();
-				console.log('++++++' + this.speechAlert);
+				//console.log('++++++' + this.speechAlert);
 			}else{
 				this.speechAlert = 'No hay mas medicamentos pendientes para hoy.';
 			}
@@ -227,7 +244,7 @@ Module.register("MMMAM-MedicalAlert",{
 
     notificationReceived: function(notification, payload, sender) {
 			if (notification === "CALENDAR_EVENTS") {
-				console.log("MedicalAlert recibio notificacion de calendario" );
+				//console.log("MedicalAlert recibio notificacion de calendario" );
 				this.listAlerts = payload;
             //Valida que haya una proxima alarma, aparte de la vigente
           if (this.listAlerts.length > 1) {
@@ -264,12 +281,12 @@ Module.register("MMMAM-MedicalAlert",{
             }
         }
         if (this.next !== null) {
-            console.log("*NEXT ALARM: "+ this.next.title);
+          //  console.log("*NEXT ALARM: "+ this.next.title);
 						this.setSpeechAlert();
         }else{
 
 				}
-				console.log("LA SIGUIENTE TOMA ES EN : " + this.setTimeToNext());
+				//console.log("LA SIGUIENTE TOMA ES EN : " + this.setTimeToNext());
         //this.updateDom(300);
     },
 
@@ -358,13 +375,7 @@ Module.register("MMMAM-MedicalAlert",{
 
 							wrapper.appendChild(sound);
 						}
-
-
         }
-
 		return wrapper;
-
 	}
-
-
 });
